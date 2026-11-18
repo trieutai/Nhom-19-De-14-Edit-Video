@@ -1,0 +1,55 @@
+VIDEO TOOL - NANG CAP DE TAI 14 (PHP + XAMPP)
+=========================================
+
+1. SAO LUU TRUOC KHI CAP NHAT
+- Sao luu database VideoToolDB bang phpMyAdmin (Export -> SQL).
+- Sao luu cac file PHP cu.
+- KHONG XOA thu muc uploads/ va outputs/: day la video goc va ket qua cu.
+
+2. COPY CHI CAC FILE CO THAY DOI VAO
+  C:\xampp\htdocs\video_tool\
+- video_editor.php: giao dien, kiem tra tham so, xep hang doi, huy/thu lai
+- db.php: ket noi va nang cap bang hien co (khong xoa du lieu)
+- VideoProcessor.php: FFmpeg, FFprobe, kiem tra dau ra
+- process_worker.php: tien trinh hang doi PHP CLI
+- upload_temp.php: tai anh an toan
+- image_editor.php: gioi han duong dan va tham so cat anh
+- test_de_tai_14.php: bo thu tu dong (file moi)
+Giu nguyen cac file khac, dac biet preview_frame.php, video_quality.php neu dang su dung.
+
+3. KHOI DONG XAMPP
+- Bat Apache va MySQL.
+- Bao dam FFmpeg va FFprobe chay duoc trong terminal bang: ffmpeg -version; ffprobe -version.
+- Neu PHP khong tim thay FFmpeg, them duong dan thu muc bin cua FFmpeg vao PATH, sau do khoi dong lai Apache va terminal.
+- PHP 8.0+ la can thiet. Bat PDO_MySQL va cac ham proc_open, shell_exec, exec neu hosting chan.
+- php.ini: upload_max_filesize=512M, post_max_size=520M, max_file_uploads=20 (sau do restart Apache).
+- Truy cap: http://localhost:8080/video_tool/video_editor.php (hay dung cong Apache thuc te).
+- Lan dau mo video_editor.php, db.php se bo sung cac cot can thiet trong MySQL.
+
+4. BAT WORKER - BAT BUOC
+Mo CMD (giu cua so nay mo trong khi xu ly video):
+  C:\xampp\php\php.exe C:\xampp\htdocs\video_tool\process_worker.php
+Worker tu lay job trang thai pending tu MySQL va chay FFmpeg; trang web khong xu ly video truc tiep nua.
+De xu ly toi da mot job roi thoat:
+  C:\xampp\php\php.exe C:\xampp\htdocs\video_tool\process_worker.php --once
+Khi tao job: web hien Cho xu ly; worker tu lay job; bam "Cap nhat" de xem trang thai.
+Dung Ctrl+C de dung worker. Neu worker bi mat ket noi/dung dot ngot, job khong co heartbeat tren 120s se duoc thu lai sau khi worker moi khoi dong.
+
+5. HUONG DAN THU NGHIEM
+  C:\xampp\php\php.exe C:\xampp\htdocs\video_tool\test_de_tai_14.php
+Bo test tu dong tao video tam 30s, kiem tra 8 tinh huong FFmpeg, sau do don tep tam.
+Test thu cong tren XAMPP:
+- Tai 1 video hop le + 1 video hong; xac nhan video hong bi tu choi.
+- Cat 5..20 giay; xem trang thai pending -> processing -> completed.
+- Tai file, do duration, width, height va audio; giao dien hien thong so da do.
+- Huy job pending va job dang processing; kiem tra khong tao output hoan tat.
+- Thu lai job error/cancelled; kiem tra job_attempts co so lan xu ly moi va tep nguon giu nguyen.
+- Mo 2 cua so worker cung luc; kiem tra moi job chi duoc nhan 1 lan.
+- Kiem tra metadata va file dau ra bang ffprobe.
+
+6. GIOI HAN VA LUU Y
+- Ket qua: bo thu FFmpeg 8/8 da chay trong moi truong phat trien; chua thu truc tiep database MySQL/XAMPP tren may cua ban.
+- Ung dung chua co he thong dang nhap, phan quyen vai tro. Chay chi tren localhost/LAN tin cay; KHONG cong khai len Internet truoc khi bo sung xac thuc, quyen truy cap va chinh sach quan ly tep.
+- Endpoint preview_frame.php va video_quality.php chua duoc nang cap trong dot nay; can gioi han tai nguyen va quyen truy cap truoc khi dua len mang cong khai.
+- Viec cat dung noi dung duoc thuc hien qua FFmpeg tai moc nhap; sai so do timestamp/frame phu thuoc FPS. Dung dung sai <= max(0.35s, min(0.75s, 2% do dai doan)).
+- Neu MySQL cu co job trang thai 'processing' do code cu de lai, can xem xet va doi ve pending sau khi dam bao khong con worker cu hoat dong.

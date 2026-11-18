@@ -4,11 +4,20 @@ $message = '';
 
 // Xử lý cắt ảnh trực quan
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type']) && $_POST['action_type'] === 'advanced_image_crop') {
-    $inputPath = $_POST['image_path'];
+    $relative = (string)($_POST['image_path'] ?? '');
+    $root = realpath(__DIR__.'/uploads');
+    $inputPath = realpath(__DIR__.'/'.$relative);
+    if (!$root || !$inputPath || !str_starts_with($inputPath,$root.DIRECTORY_SEPARATOR) || !is_file($inputPath)) {
+        http_response_code(400); exit('Đường dẫn ảnh không hợp lệ');
+    }
     $x = intval($_POST['crop_x']);
     $y = intval($_POST['crop_y']);
     $w = intval($_POST['crop_w']);
     $h = intval($_POST['crop_h']);
+    $size = @getimagesize($inputPath);
+    if (!$size || $x<0 || $y<0 || $w<1 || $h<1 || $x+$w>$size[0] || $y+$h>$size[1]) {
+        http_response_code(400); exit('Thông số cắt ảnh vượt giới hạn');
+    }
 
     $outputDir = 'outputs/';
     if (!is_dir($outputDir)) { mkdir($outputDir, 0777, true); }
@@ -40,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type']) && $_P
 </head>
 <body>
     <nav class="navbar navbar-dark px-4 py-3 shadow-sm">
-        <a class="navbar-brand fw-bold" href="index.php"><i class="fa-solid fa-crop me-2 text-info"></i>DukTay Edit <span class="badge bg-info text-dark ms-2">Image Branch</span></a>
+        <a class="navbar-brand fw-bold" href="index.php"><i class="fa-solid fa-crop me-2 text-info"></i>VideoStudio Pro <span class="badge bg-info text-dark ms-2">Image Branch</span></a>
         <a href="index.php" class="btn btn-outline-light btn-sm rounded-pill px-3"><i class="fa-solid fa-house me-1"></i>Trang Chủ</a>
     </nav>
 

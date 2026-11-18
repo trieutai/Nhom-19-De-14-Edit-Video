@@ -1,0 +1,32 @@
+# Runtime data: uploaded videos, generated media, thumbnails
+/uploads/*
+!/uploads/.gitkeep
+/outputs/*
+!/outputs/.gitkeep
+/cache/
+/tmp/
+/temp/
+
+# Local environments, secrets and database dumps
+.env
+.env.*
+!.env.example
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+*.bak
+*.log
+*.pid
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Dependencies / test-generated artifacts
+/vendor/
+/node_modules/
+/test_output/
+/coverage/
