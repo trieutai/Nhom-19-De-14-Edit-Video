@@ -1,0 +1,53 @@
+DUKTAY EDIT - CAP NHAT XOA VIDEO, DANG NHAP VA CACH LY TAI KHOAN
+
+1. SAO LUU TRUOC KHI CAP NHAT:
+   - Sao chep C:\xampp\htdocs\video_tool ra cho an toan.
+   - Xuat backup database VideoToolDB bang phpMyAdmin (Export -> SQL).
+   - Backup thu muc uploads va outputs (chua video that).
+
+2. CHI GHI DE CAC FILE DUOC DONG GOI TRONG ZIP NAY:
+   - Giai nen vao C:\xampp\htdocs\video_tool, giu nguyen cau truc con.
+   - Chu y: co 2 file uploads\.htaccess va outputs\.htaccess; Windows can hien file an neu can.
+   - Khong xoa thu muc uploads/ va outputs/ dang co; khong xoa video cu.
+   - Giu nguyen VideoProcessor.php va cac file khac khong co trong ZIP.
+
+3. MO XAMPP:
+   - Bat Apache va MySQL/MariaDB.
+   - Mo http://localhost:8080/video_tool/index.php (doi cong neu may su dung cong khac).
+   - Lan dau vao login.php, tao tai khoan email va mat khau >=8 ky tu.
+   - db.php se them bang users/images/image_outputs va cot user_id neu chua co.
+   - Tai video moi de test, bam "Cong viec" -> "Chay".
+
+4. NHUNG THAY DOI:
+   - Trang chu co nut Dang nhap/Dang ky va Dang xuat.
+   - Bang cong viec co nut Xoa (xoa job + video xuat cua job, KHONG xoa nguon).
+   - Man hinh Video co "Xoa video nguon" (xoa nguon + tat ca job/video xuat lien quan).
+   - Khong xoa khi job dang processing: Huy, doi worker dung roi moi Xoa.
+   - Moi tai khoan chi duoc xem jobs/videos cua minh. uploads/user_ID va outputs/user_ID.
+   - media.php kiem tra tai khoan truoc khi phuc vu anh/video/download.
+   - uploads/.htaccess va outputs/.htaccess chan URL truy cap truc tiep.
+   - Nhanh image_editor cung phai dang nhap, upload/crop theo tai khoan.
+
+5. DU LIEU CU:
+   - Du lieu videos/jobs da ton tai truoc nang cap KHONG duoc tu dong gan cho bat ky tai khoan nao.
+   - Chung van nam trong database va thu muc cu, nhung khong hien thi cho tai khoan moi.
+   - CAN du lieu cu: sao luu va xac minh chu so huu truoc khi chuyen du lieu, KHONG tu sua user_id vo dieu kien.
+
+6. KIEM TRA BAO MAT BAT BUOC TREN MAY XAMPP:
+   a) Tao hai tai khoan A va B, dang A upload 1 video, cat xuat.
+   b) Dang xuat, dang B: khong thay video/job cua A.
+   c) Voi B, truy cap URL media.php?type=source&id=<ID cua A> => phai nhan HTTP 404.
+   d) Thu mo URL truc tiep http://localhost:8080/video_tool/uploads/<tenfilecu>.mp4
+      => PHAI nhan HTTP 403. Lam tuong tu voi /outputs/.
+      Neu truy cap duoc 200 thi Apache chua nap .htaccess / AllowOverride:
+      PHAI cau hinh Apache chan uploads va outputs truoc khi su dung nhieu tai khoan.
+   e) B khong duoc huy/xoa/chay job cua A (POST + CSRF hop le cua B).
+   f) Dang A xoa 1 job: file output va thumbnail phai bien mat, video nguon con nguyen.
+   g) Dang A xoa video nguon: video nguon, thumbnail, tat ca job va ket qua lien quan bien mat.
+   h) Dang A/B cap nhat lai trang va khoi dong lai XAMPP de kiem tra dang nhap.
+
+7. GIOI HAN KIEM TRA:
+   - Da chay 'php -l' cho tat ca file PHP trong goi: khong co loi cu phap.
+   - CHUA duoc thu truc tiep voi MySQL/MariaDB va Apache cua ban. Phai test muc 6.
+   - KHONG duoc dua len internet cong khai truoc khi kiem tra .htaccess/HTTPS, gioi han upload,
+     va thuc hien danh gia an toan trien khai.

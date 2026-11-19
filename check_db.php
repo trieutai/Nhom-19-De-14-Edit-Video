@@ -1,12 +1,14 @@
 <?php
-require_once 'db.php';
+require_once __DIR__.'/auth.php';
+require_once __DIR__.'/db.php';
+$uid=vtRequireLogin();
 
 // Lấy toàn bộ dữ liệu từ các bảng trong cơ sở dữ liệu
-$videos =$pdo->query("SELECT * FROM videos ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+$q=$pdo->prepare('SELECT * FROM videos WHERE user_id=? ORDER BY id DESC');$q->execute([$uid]);$videos=$q->fetchAll(PDO::FETCH_ASSOC);
 $presets =$pdo->query("SELECT * FROM presets ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
-$jobs =$pdo->query("SELECT * FROM jobs ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
-$job_attempts =$pdo->query("SELECT * FROM job_attempts ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
-$outputs =$pdo->query("SELECT * FROM outputs ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+$q=$pdo->prepare('SELECT * FROM jobs WHERE user_id=? ORDER BY id DESC');$q->execute([$uid]);$jobs=$q->fetchAll(PDO::FETCH_ASSOC);
+$q=$pdo->prepare('SELECT a.* FROM job_attempts a JOIN jobs j ON j.id=a.job_id WHERE j.user_id=? ORDER BY a.id DESC');$q->execute([$uid]);$job_attempts=$q->fetchAll(PDO::FETCH_ASSOC);
+$q=$pdo->prepare('SELECT o.* FROM outputs o JOIN jobs j ON j.id=o.job_id WHERE j.user_id=? ORDER BY o.id DESC');$q->execute([$uid]);$outputs=$q->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="vi">

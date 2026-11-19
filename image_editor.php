@@ -1,35 +1,37 @@
 <?php
-require_once 'db.php';
-$message = '';
-
-// Xử lý cắt ảnh trực quan
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type']) && $_POST['action_type'] === 'advanced_image_crop') {
-    $relative = (string)($_POST['image_path'] ?? '');
-    $root = realpath(__DIR__.'/uploads');
-    $inputPath = realpath(__DIR__.'/'.$relative);
-    if (!$root || !$inputPath || !str_starts_with($inputPath,$root.DIRECTORY_SEPARATOR) || !is_file($inputPath)) {
-        http_response_code(400); exit('Đường dẫn ảnh không hợp lệ');
-    }
-    $x = intval($_POST['crop_x']);
-    $y = intval($_POST['crop_y']);
-    $w = intval($_POST['crop_w']);
-    $h = intval($_POST['crop_h']);
-    $size = @getimagesize($inputPath);
-    if (!$size || $x<0 || $y<0 || $w<1 || $h<1 || $x+$w>$size[0] || $y+$h>$size[1]) {
-        http_response_code(400); exit('Thông số cắt ảnh vượt giới hạn');
-    }
-
-    $outputDir = 'outputs/';
-    if (!is_dir($outputDir)) { mkdir($outputDir, 0777, true); }
-    $outputPath = $outputDir . 'cropped_' . time() . '.jpg';
-
-    $cmd = sprintf('ffmpeg -y -i %s -vf "crop=%d:%d:%d:%d" %s 2>&1', escapeshellarg($inputPath), $w, $h, $x, $y, escapeshellarg($outputPath));
-    exec($cmd);
-
-    if (file_exists($outputPath)) {
-        $message = "<div class='alert alert-success shadow-sm rounded-4'>Cắt ảnh thành công! <a href='$outputPath' class='fw-bold' download>Tải xuống ngay</a></div>";
+require_once __DIR__.'/auth.php';
+require_once __DIR__.'/db.php';
+$uid=vtRequireLogin();
+$message='';
+if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action_type']??'')==='advanced_image_crop') {
+    vtVerifyCsrf();
+    $imageId=filter_var($_POST['image_path'] ?? null,FILTER_VALIDATE_INT);
+    $x=filter_var($_POST['crop_x'] ?? null,FILTER_VALIDATE_INT);
+    $y=filter_var($_POST['crop_y'] ?? null,FILTER_VALIDATE_INT);
+    $w=filter_var($_POST['crop_w'] ?? null,FILTER_VALIDATE_INT);
+    $h=filter_var($_POST['crop_h'] ?? null,FILTER_VALIDATE_INT);
+    $stmt=$pdo->prepare('SELECT filepath FROM images WHERE id=? AND user_id=?');
+    $stmt->execute([$imageId ?: 0,$uid]);$source=$stmt->fetchColumn();
+    if (!$source || $x===false || $y===false || $w===false || $h===false || $x<0 || $y<0 || $w<1 || $h<1 || $w>10000 || $h>10000 || str_contains($source,'..')) {
+        $message='<div class="alert alert-danger">Ảnh hoặc vùng cắt không hợp lệ.</div>';
     } else {
-        $message = "<div class='alert alert-danger shadow-sm rounded-4'>Lỗi thực thi cắt ảnh qua FFmpeg.</div>";
+        $real=realpath(__DIR__.'/'.$source);
+        $ownerBase=realpath(__DIR__.'/uploads/user_'.$uid);
+        if (!$real || !$ownerBase || !str_starts_with($real,$ownerBase.DIRECTORY_SEPARATOR)) {
+            $message='<div class="alert alert-danger">Không được phép truy cập ảnh này.</div>';
+        } else {
+            $outDir=__DIR__.'/outputs/user_'.$uid;
+            if (!is_dir($outDir)) mkdir($outDir,0775,true);
+            $relative='outputs/user_'.$uid.'/cropped_'.bin2hex(random_bytes(16)).'.jpg';
+            $absolute=__DIR__.'/'.$relative;
+            $cmd='ffmpeg -nostdin -v error -y -i '.escapeshellarg($real).' -vf '.escapeshellarg("crop=$w:$h:$x:$y").' '.escapeshellarg($absolute).' 2>&1';
+            $lines=[];$code=1;exec($cmd,$lines,$code);
+            if ($code===0 && is_file($absolute) && filesize($absolute)>0) {
+                $pdo->prepare('INSERT INTO image_outputs(user_id,source_image_id,filepath) VALUES (?,?,?)')->execute([$uid,$imageId,$relative]);
+                $outId=(int)$pdo->lastInsertId();
+                $message='<div class="alert alert-success">Đã cắt ảnh thành công! <a href="media.php?type=image_output&amp;id='.$outId.'&amp;download=1">Tải ảnh xuống</a></div>';
+            } else $message='<div class="alert alert-danger">Cắt ảnh thất bại. Kiểm tra tọa độ và FFmpeg.</div>';
+        }
     }
 }
 ?>
@@ -50,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type']) && $_P
 <body>
     <nav class="navbar navbar-dark px-4 py-3 shadow-sm">
         <a class="navbar-brand fw-bold" href="index.php"><i class="fa-solid fa-crop me-2 text-info"></i>VideoStudio Pro <span class="badge bg-info text-dark ms-2">Image Branch</span></a>
-        <a href="index.php" class="btn btn-outline-light btn-sm rounded-pill px-3"><i class="fa-solid fa-house me-1"></i>Trang Chủ</a>
+        <div><span class="small text-white me-3"><?=htmlspecialchars((string)($_SESSION['vt_user_email']??''),ENT_QUOTES,'UTF-8')?></span><a href="index.php" class="btn btn-outline-light btn-sm rounded-pill px-3">Trang chủ</a></div>
     </nav>
 
     <div class="container my-4">
@@ -86,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type']) && $_P
                                 <p class="small text-muted mb-4">Khung cắt đã sẵn sàng. Tương tác trực tiếp trên ảnh rồi bấm nút lưu bên dưới.</p>
                                 
                                 <form action="image_editor.php" method="POST">
-                                    <input type="hidden" name="action_type" value="advanced_image_crop">
+                                    <input type="hidden" name="action_type" value="advanced_image_crop"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars(vtCsrfToken(),ENT_QUOTES,'UTF-8')?>">
                                     <input type="hidden" name="image_path" id="imagePathInput">
                                     <input type="hidden" name="crop_x" id="cropX">
                                     <input type="hidden" name="crop_y" id="cropY">
@@ -120,13 +122,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type']) && $_P
                 if (file) {
                     const formData = new FormData();
                     formData.append('temp_image', file);
+                    formData.append('csrf_token', <?=json_encode(vtCsrfToken())?>);
                     
                     fetch('upload_temp.php', { method: 'POST', body: formData })
                     .then(res => res.json())
                     .then(data => {
                         if (data.success) {
                             sourceImage.src = data.path;
-                            imagePathInput.value = data.path;
+                            imagePathInput.value = data.id;
                             placeholderText.style.display = 'none';
                             sourceImage.style.display = 'block';
 

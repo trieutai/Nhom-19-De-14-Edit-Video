@@ -74,3 +74,20 @@ foreach ([
 ] as $entry) videoToolEnsureColumn($pdo,...$entry);
 $pdo->exec("ALTER TABLE job_attempts MODIFY COLUMN status ENUM('processing','success','failed','cancelled') NOT NULL DEFAULT 'processing'");
 // Pre-existing rows have no active attempt, and remain untouched.
+// Account isolation: existing rows are retained as unassigned, NEVER silently claimed.
+$pdo->exec("CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,email VARCHAR(190) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB");
+videoToolEnsureColumn($pdo,'videos','user_id','INT NULL DEFAULT NULL');
+videoToolEnsureColumn($pdo,'jobs','user_id','INT NULL DEFAULT NULL');
+$pdo->exec("CREATE INDEX IF NOT EXISTS vt_idx_user_videos ON videos(user_id)");
+$pdo->exec("CREATE INDEX IF NOT EXISTS vt_idx_user_jobs ON jobs(user_id)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS images (
+    id INT AUTO_INCREMENT PRIMARY KEY,user_id INT NOT NULL,filepath VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX idx_image_owner(user_id)
+) ENGINE=InnoDB");
+$pdo->exec("CREATE TABLE IF NOT EXISTS image_outputs (
+    id INT AUTO_INCREMENT PRIMARY KEY,user_id INT NOT NULL,source_image_id INT NOT NULL,filepath VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX idx_image_out_owner(user_id)
+) ENGINE=InnoDB");

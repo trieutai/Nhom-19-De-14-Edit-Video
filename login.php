@@ -1,141 +1,40 @@
 <?php
-require_once 'db.php';
-session_start();
-
-$error = '';
-
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $login_input = trim($_POST['login_input']);
-    $password = $_POST['password'];
-
-    if (empty($login_input) || empty($password)) {
-        $error = "Vui lòng nhập đầy đủ thông tin!";
+require_once __DIR__.'/auth.php';
+require_once __DIR__.'/db.php';
+$next=(string)($_POST['next'] ?? $_GET['next'] ?? 'index.php');
+if (!in_array($next,['index.php','video_editor.php','image_editor.php'],true)) $next='index.php';
+if (vtCurrentUserId()) { header('Location: '.$next); exit; }
+$error='';
+if ($_SERVER['REQUEST_METHOD']==='POST') {
+    vtVerifyCsrf();
+    $mode=(string)($_POST['mode'] ?? 'login');
+    $email=strtolower(trim((string)($_POST['email'] ?? '')));
+    $password=(string)($_POST['password'] ?? '');
+    if (!filter_var($email,FILTER_VALIDATE_EMAIL) || strlen($email)>190 || strlen($password)<8 || strlen($password)>200) {
+        $error='Email hoặc mật khẩu không hợp lệ (mật khẩu ít nhất 8 ký tự).';
+    } elseif ($mode==='register') {
+        try {
+            $pdo->prepare('INSERT INTO users(email,password_hash) VALUES (?,?)')->execute([$email,password_hash($password,PASSWORD_DEFAULT)]);
+            session_regenerate_id(true);
+            $_SESSION['vt_user_id']=(int)$pdo->lastInsertId();
+            $_SESSION['vt_user_email']=$email;
+            header('Location: '.$next); exit;
+        } catch (PDOException $e) { $error='Email đã được đăng ký hoặc không thể tạo tài khoản.'; }
     } else {
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? OR email = ?");
-        $stmt->execute([$login_input, $login_input]);
-        $user = $stmt->fetch();
-
-        if ($user && password_verify($password, $user['password'])) {
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['username'] = $user['username'];
-            
-            if (!is_dir("uploads/" . $user['username'])) { mkdir("uploads/" . $user['username'], 0777, true); }
-            if (!is_dir("outputs/" . $user['username'])) { mkdir("outputs/" . $user['username'], 0777, true); }
-
-            header("Location: index.php");
-            exit();
-        } else {
-            $error = "Tên đăng nhập, email hoặc mật khẩu không chính xác!";
+        $stmt=$pdo->prepare('SELECT id,email,password_hash FROM users WHERE email=? LIMIT 1');
+        $stmt->execute([$email]); $user=$stmt->fetch();
+        if (!$user || !password_verify($password,$user['password_hash'])) $error='Email hoặc mật khẩu không đúng.';
+        else {
+            session_regenerate_id(true);
+            $_SESSION['vt_user_id']=(int)$user['id'];
+            $_SESSION['vt_user_email']=$user['email'];
+            header('Location: '.$next); exit;
         }
     }
 }
 ?>
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <title>Đăng nhập - DukTay Edit</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body {
-            background-color: #0b0f19;
-            color: #f3f4f6;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0;
-        }
-        .auth-card {
-            background-color: #161e2e;
-            border: 1px solid #2d3748;
-            border-radius: 12px;
-            padding: 40px;
-            width: 100%;
-            max-width: 420px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
-        }
-        .form-label {
-            color: #cbd5e1 !important; /* Đổi màu nhãn sáng hơn, dễ đọc */
-            font-weight: 500;
-        }
-        .form-control {
-            background-color: #0b0f19 !important;
-            border: 1px solid #4a5568 !important;
-            color: #fff !important;
-            border-radius: 6px;
-            padding: 11px 14px;
-            font-size: 14px;
-        }
-        .form-control:focus {
-            background-color: #0b0f19 !important;
-            border-color: #3b82f6 !important;
-            color: #fff !important;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important;
-        }
-        .form-control::placeholder {
-            color: #718096 !important;
-        }
-        .btn-primary {
-            background-color: #2563eb;
-            border-color: #2563eb;
-            font-weight: 600;
-            padding: 11px;
-            border-radius: 6px;
-            transition: background 0.2s;
-        }
-        .btn-primary:hover {
-            background-color: #1d4ed8;
-            border-color: #1d4ed8;
-        }
-        .brand-logo {
-            font-size: 26px;
-            font-weight: 600;
-            color: #fff;
-            text-align: center;
-            margin-bottom: 8px;
-        }
-        .subtitle {
-            color: #94a3b8;
-            text-align: center;
-            font-size: 14px;
-            margin-bottom: 28px;
-        }
-    </style>
-</head>
-<body>
-
-<div class="auth-card">
-    <div class="brand-logo">
-        <i class="fa-solid fa-clapperboard text-primary me-2"></i>VideoStudio
-    </div>
-    
-    <div class="subtitle">Đăng nhập vào không gian làm việc của bạn</div>
-
-    <?php if(!empty($error)): ?>
-        <div class="alert alert-danger border-0 bg-danger bg-opacity-25 text-danger small py-2 mb-3 text-center">
-            <?= htmlspecialchars($error) ?>
-        </div>
-    <?php endif; ?>
-
-    <form method="POST">
-        <div class="mb-3">
-            <label class="form-label small">Tên đăng nhập hoặc Email</label>
-            <input type="text" name="login_input" class="form-control" placeholder="Nhập username hoặc email" required autocomplete="username">
-        </div>
-        <div class="mb-4">
-            <label class="form-label small">Mật khẩu</label>
-            <input type="password" name="password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
-        </div>
-        <button type="submit" class="btn btn-primary w-100 mb-3 shadow-sm">Đăng Nhập</button>
-    </form>
-
-    <div class="text-center small" style="color: #94a3b8;">
-        Chưa có tài khoản? <a href="register.php" class="text-primary text-decoration-none fw-semibold">Đăng ký ngay</a>
-    </div>
-</div>
-
-</body>
-</html>
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tài khoản - DukTay Edit</title>
+<style>*{box-sizing:border-box}body{font-family:Segoe UI,Arial,sans-serif;background:#101318;color:#f2f4fa;display:grid;place-items:center;min-height:100vh;margin:0}.box{width:min(430px,94vw);background:#1b2029;border:1px solid #363d49;border-radius:18px;padding:32px}h1{margin:0 0 12px}p{color:#aeb7c6;line-height:1.6}label{display:block;margin:18px 0 7px}input{width:100%;padding:12px;background:#11151b;border:1px solid #505866;color:#fff;border-radius:8px}button{cursor:pointer;border:0;border-radius:8px;background:#ffdb47;padding:12px 18px;font-weight:700;color:#111;margin-top:22px;width:100%}a{color:#ffe06f}.error{padding:10px;background:#47262c;color:#ffd5dc;border-radius:8px}small{color:#aeb7c6}</style></head>
+<body><main class="box"><a href="index.php">← Trang chủ</a><h1>DukTay Edit</h1><p>Đăng nhập để quản lý video và kết quả của riêng bạn.</p>
+<?php if($error):?><div class="error"><?=htmlspecialchars($error,ENT_QUOTES,'UTF-8')?></div><?php endif;?>
+<form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars(vtCsrfToken(),ENT_QUOTES,'UTF-8')?>"><input type="hidden" name="next" value="<?=htmlspecialchars($next,ENT_QUOTES,'UTF-8')?>"><label>Email</label><input type="email" name="email" required maxlength="190" autocomplete="username"><label>Mật khẩu</label><input type="password" name="password" required minlength="8" autocomplete="current-password"><button name="mode" value="login">Đăng nhập</button><button name="mode" value="register" style="margin-top:10px;background:#2b3442;color:#fff;border:1px solid #647088">Tạo tài khoản mới</button></form><p><small>Mỗi tài khoản chỉ được truy cập video và file của chính mình.</small></p></main></body></html>
